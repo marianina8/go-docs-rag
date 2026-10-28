@@ -210,7 +210,8 @@ func TestEndToEnd(t *testing.T) {
 	}
 
 	// eval: the retrieval test passes for the expected chunk
-	cases := `[{"question":"how do I generate a UUID in Go?","expect":"go1.27#uuid"}]`
+	cases := `[{"question":"how do I generate a UUID in Go?","expect":"go1.27#uuid"},
+		{"question":"what does asynctimerchan do?","expect":["nope#x","go1.27#time"]}]`
 	os.WriteFile(filepath.Join(dir, "evals.json"), []byte(cases), 0o644)
 	if err := cmdEval([]string{"--file", filepath.Join(dir, "evals.json"), "--index", idx}); err != nil {
 		t.Fatal(err)

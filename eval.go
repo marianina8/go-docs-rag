@@ -8,10 +8,28 @@ import (
 	"strings"
 )
 
-// An EvalCase is one real question plus the chunk that answers it.
+// An EvalCase is one real question plus the chunk (or chunks) that answer it.
 type EvalCase struct {
-	Question string `json:"question"`
-	Expect   string `json:"expect"` // a chunk ID, or the start of one (e.g. "go1.27#uuid")
+	Question string  `json:"question"`
+	Expect   Expects `json:"expect"` // chunk IDs or their starts, e.g. "go1.27#uuid"
+}
+
+// Expects accepts one ID ("go1.27#uuid") or a list (["a#x", "b#y"]):
+// some questions are answered equally well by more than one chunk.
+type Expects []string
+
+func (e *Expects) UnmarshalJSON(b []byte) error {
+	var one string
+	if err := json.Unmarshal(b, &one); err == nil {
+		*e = Expects{one}
+		return nil
+	}
+	var many []string
+	if err := json.Unmarshal(b, &many); err != nil {
+		return fmt.Errorf("expect must be a string or a list of strings: %w", err)
+	}
+	*e = many
+	return nil
 }
 
 // cmdEval tests retrieval on its own: for each question, did the expected
@@ -47,7 +65,7 @@ func cmdEval(args []string) error {
 			if err != nil {
 				return err
 			}
-			rank := rankOf(ix, hits, c.Expect)
+			rank := rankOf(ix, hits, c.Expect...)
 			if rank > 0 {
 				found[m]++
 				row += fmt.Sprintf(" %-8s", fmt.Sprintf("✓ #%d", rank))
@@ -65,11 +83,13 @@ func cmdEval(args []string) error {
 	return nil
 }
 
-// rankOf returns the 1-based rank of the expected chunk, or 0 if it's missing.
-func rankOf(ix *Index, hits []Hit, expect string) int {
+// rankOf returns the 1-based rank of the first expected chunk, or 0 if none came back.
+func rankOf(ix *Index, hits []Hit, expect ...string) int {
 	for i, h := range hits {
-		if strings.HasPrefix(ix.Chunks[h.Chunk].ID, expect) {
-			return i + 1
+		for _, e := range expect {
+			if strings.HasPrefix(ix.Chunks[h.Chunk].ID, e) {
+				return i + 1
+			}
 		}
 	}
 	return 0

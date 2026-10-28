@@ -4,6 +4,8 @@ A tiny **retrieval-augmented generation (RAG)** demo over the official Go docs, 
 
 It's the companion repo for **"Do You Still Need RAG? (Context Windows Got Huge)"** in the *System Design in 2026* series on YouTube: [FILL IN: video link].
 
+A real run (nomic-embed-text + llama3.2, October 2026):
+
 ```
 $ go run . ask "how do I generate a UUID in Go?"
 
@@ -13,11 +15,20 @@ mode: hybrid · top 3
 [1] Go 1.27 Release Notes › Standard library › New uuid package   (score 0.033)
     The new `uuid` package generates and parses UUIDs.
     https://go.dev/doc/go1.27#uuid
-...
+
+[2] Go 1.24 Release Notes › Linker   (score 0.032)
+    The linker now generates a GNU build ID (the ELF `NT_GNU_BUILD_ID` note) on ELF platforms and a UUID (the Mach…
+    https://go.dev/doc/go1.24#linker
+
+[3] Go 1.27 Release Notes › Ports › PowerPC   (score 0.029)
+    On the big-endian 64-bit PowerPC port on Linux (`GOOS=linux` `GOARCH=ppc64`), the Go toolchain now generates b…
+    https://go.dev/doc/go1.27#ppc64
+
 answer (llama3.2):
-Use the new standard library `uuid` package, added in Go 1.27 [1].
+According to [1], you can generate a UUID in Go using the `uuid.New()` function.
 ```
-(Illustrative output: scores and the exact answer depend on your models.)
+
+Retrieval found the right page. Now check the citation: source [1] never mentions `uuid.New()`. The function does exist ([pkg.go.dev/uuid](https://pkg.go.dev/uuid)), so the answer happens to be right, but the model filled that part in from training, not from the source. That's why RAG answers cite: so you can check them.
 
 ## Quick start
 
@@ -64,17 +75,18 @@ Add `--no-answer` to see only what retrieval found, and `--k 5` to change top K.
 
 ## Things to try (where RAG breaks)
 
-1. **Exact words.** `asynctimerchan` is a real GODEBUG setting. Compare:
+1. **The lookalike: an outdated answer that's "close on the map."** The Go FAQ still has *"Why does Go not support methods with type parameters?"*, but Go 1.27 added generic methods. Compare vector-only search with hybrid:
+   ```sh
+   go run . ask --mode vector "Can a method declare its own type parameters?"
+   go run . ask --mode hybrid "Can a method declare its own type parameters?"
+   ```
+   In our run, vector-only search missed the Go 1.27 release notes in its top 3; hybrid ranked them #1 and the FAQ #2. Read which answer each one gives, and which source it cites.
+2. **Exact words.** Embeddings are good at meaning and can blur exact strings like error codes and setting names; keyword search matches them literally. Try a real GODEBUG setting:
    ```sh
    go run . ask --mode vector  --no-answer "what does asynctimerchan do?"
    go run . ask --mode keyword --no-answer "what does asynctimerchan do?"
    ```
-   Embeddings are good at meaning and weaker at exact strings; keyword search finds the string. Hybrid gets both.
-2. **The lookalike (an older answer).** The Go FAQ has an entry, *"Why does Go not permit methods to declare type parameters?"*, but Go 1.27 added generic methods. Ask:
-   ```sh
-   go run . ask --no-answer "Can a method declare its own type parameters?"
-   ```
-   and check whether the FAQ chunk or the Go 1.27 release notes come back first. Both are "close on the map." Only one is current.
+   Honest result: in our run, vector search found it fine (#1), because the word appears in several chunks and their breadcrumbs. Try rarer strings from the release notes and see where it breaks.
 3. **With and without RAG.** Ask the same model directly, with no retrieval:
    ```sh
    ollama run llama3.2 "How do I generate a UUID in Go? Answer in two sentences."
@@ -83,16 +95,31 @@ Add `--no-answer` to see only what retrieval found, and `--k 5` to change top K.
 
 ## Test retrieval on its own
 
-`evals.json` holds 12 real questions, each with the chunk that answers it. `go run . eval` runs only the search (no model answers) in all three modes and reports whether the right chunk came back in the top K:
+`evals.json` holds 12 real questions, each with the chunk (or chunks) that answer it. `go run . eval` runs only the search (no model answers) in all three modes and reports whether the right chunk came back in the top K. A real run:
 
 ```
-question                                    keyword  vector   hybrid
-How do I generate a UUID in Go?             ✓ #1     ...      ...
-...
-right chunk in top 3:  keyword 10/12  vector ?/12  hybrid ?/12
+question                                             keyword  vector   hybrid
+How do I generate a UUID in Go?                      ✓ #1     ✓ #1     ✓ #1
+What does asynctimerchan do?                         ✓ #3     ✓ #1     ✓ #1
+Can a method declare its own type parameters?        ✓ #1     ✗        ✓ #1
+What is the GOTOOLCHAIN setting?                     ✓ #1     ✓ #1     ✓ #1
+How do I add a dependency to my module?              ✓ #2     ✓ #1     ✓ #1
+How does GOGC change how often the garbage collect…  ✓ #2     ✓ #1     ✓ #1
+How do I set a memory limit for the Go runtime?      ✓ #1     ✓ #2     ✓ #1
+Should getter methods start with Get?                ✓ #1     ✓ #1     ✓ #1
+Can I range over an integer?                         ✓ #1     ✗        ✓ #2
+How do I write a fuzz test?                          ✗        ✗        ✗
+How do I set up a workspace with multiple modules?   ✗        ✗        ✗
+What is profile-guided optimization?                 ✓ #3     ✓ #2     ✓ #2
+
+right chunk in top 3:  keyword 10/12  vector 8/12  hybrid 10/12
 ```
 
-If retrieval misses, no prompt will save the answer: the model can't use what it never saw. Add your own questions to `evals.json` (the `expect` field is a chunk ID or its start, like `go1.27#uuid`; `ask` doesn't print IDs, but `data/index.json` has them).
+Two lessons from that table:
+- **Hybrid wins** where vector alone misses (generic methods, range over int).
+- **The test can be wrong too.** The fuzz miss was a bad label: the chunk that really answers it is the tutorial's "Add a fuzz test › Write the code," not the one we'd picked. `expect` now accepts a list for questions with more than one right chunk, so your run will show that row fixed. The workspaces miss is real: the tutorial's setup steps sit under generic headings.
+
+If retrieval misses, no prompt will save the answer: the model can't use what it never saw. Add your own questions to `evals.json`. The `expect` field is a chunk ID or its start, like `go1.27#uuid`, or a list of them. `ask` doesn't print IDs, but `data/index.json` has them.
 
 ## Not in this demo (on purpose)
 

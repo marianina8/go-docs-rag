@@ -8,7 +8,7 @@
   {"question": "How do I set a memory limit for the Go runtime?", "expect": "gc-guide#Memory_limit"},
   {"question": "Should getter methods start with Get?", "expect": "effective_go#Getters"},
   {"question": "Can I range over an integer?", "expect": "go1.22#language"},
-  {"question": "How do I write a fuzz test?", "expect": "tutorial/fuzz#fuzz_test"},
+  {"question": "How do I write a fuzz test?", "expect": ["tutorial/fuzz#fuzz_test", "tutorial/fuzz#write-the-code-2"]},
   {"question": "How do I set up a workspace with multiple modules?", "expect": "tutorial/workspaces#initialize-the-workspace"},
   {"question": "What is profile-guided optimization?", "expect": "pgo#profile-guided-optimization"}
 ]
