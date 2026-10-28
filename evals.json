@@ -1,0 +1,14 @@
+[
+  {"question": "How do I generate a UUID in Go?", "expect": "go1.27#uuid"},
+  {"question": "What does asynctimerchan do?", "expect": "go1.23#timer-changes"},
+  {"question": "Can a method declare its own type parameters?", "expect": "go1.27#language"},
+  {"question": "What is the GOTOOLCHAIN setting?", "expect": "toolchain#GOTOOLCHAIN"},
+  {"question": "How do I add a dependency to my module?", "expect": "modules/managing-dependencies#adding_dependency"},
+  {"question": "How does GOGC change how often the garbage collector runs?", "expect": "gc-guide#GOGC"},
+  {"question": "How do I set a memory limit for the Go runtime?", "expect": "gc-guide#Memory_limit"},
+  {"question": "Should getter methods start with Get?", "expect": "effective_go#Getters"},
+  {"question": "Can I range over an integer?", "expect": "go1.22#language"},
+  {"question": "How do I write a fuzz test?", "expect": "tutorial/fuzz#fuzz_test"},
+  {"question": "How do I set up a workspace with multiple modules?", "expect": "tutorial/workspaces#initialize-the-workspace"},
+  {"question": "What is profile-guided optimization?", "expect": "pgo#profile-guided-optimization"}
+]
